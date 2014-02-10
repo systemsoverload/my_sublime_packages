@@ -75,9 +75,8 @@
 	"highlight_line": true,
 	"ignored_packages":
 	[
-		"Markdown",
-		"Git",
-		"Vintage"
+		"Vintage",
+		"Markdown"
 	],
 	"ignored_words":
 	[
