@@ -1,5 +1,6 @@
 import os
 import sys
+import io
 import hashlib
 import base64
 from operator import attrgetter
@@ -244,14 +245,26 @@ class FlooHandler(base.BaseHandler):
         self.bufs[data['id']]['path'] = data['path']
 
     def _on_delete_buf(self, data):
-        path = utils.get_full_path(data['path'])
+        buf_id = data['id']
         try:
-            utils.rm(path)
-        except Exception:
-            pass
+            buf = self.bufs.get(buf_id)
+            if buf:
+                del self.paths_to_ids[buf['path']]
+                del self.bufs[buf_id]
+        except KeyError:
+            msg.debug('KeyError deleting buf id %s' % buf_id)
+        # TODO: if data['unlink'] == True, add to ignore?
+        action = 'removed'
+        path = utils.get_full_path(data['path'])
+        if data.get('unlink', False):
+            action = 'deleted'
+            try:
+                utils.rm(path)
+            except Exception as e:
+                msg.debug('Error deleting %s: %s' % (path, str(e)))
         user_id = data.get('user_id')
         username = self.get_username_by_id(user_id)
-        msg.log('%s deleted %s' % (username, path))
+        msg.log('%s %s %s' % (username, action, path))
 
     @utils.inlined_callbacks
     def _on_room_info(self, data):
@@ -300,18 +313,22 @@ Do you want to request edit permission?'''
                     changed_bufs.append(buf_id)
             else:
                 try:
-                    buf_fd = open(buf_path, 'rb')
-                    buf_buf = buf_fd.read()
-                    md5 = hashlib.md5(buf_buf).hexdigest()
+                    if buf['encoding'] == "utf8":
+                        buf_fd = io.open(buf_path, 'Urt', encoding='utf8')
+                        buf_buf = buf_fd.read()
+                        md5 = hashlib.md5(buf_buf.encode('utf-8')).hexdigest()
+                    else:
+                        buf_fd = open(buf_path, 'rb')
+                        buf_buf = buf_fd.read()
+                        md5 = hashlib.md5(buf_buf).hexdigest()
                     if md5 == buf['md5']:
                         msg.debug('md5 sum matches. not getting buffer %s' % buf['path'])
-                        if buf['encoding'] == 'utf8':
-                            buf_buf = buf_buf.decode('utf-8')
                         buf['buf'] = buf_buf
                     elif self.should_get_bufs:
+                        msg.debug('md5 should not getting buffer %s' % buf['path'])
                         changed_bufs.append(buf_id)
                 except Exception as e:
-                    msg.debug('Error calculating md5:', e)
+                    msg.debug('Error calculating md5 for %s, %s' % (buf['path'], e))
                     missing_bufs.append(buf_id)
 
         if changed_bufs and self.should_get_bufs:
@@ -383,12 +400,11 @@ Do you want to request edit permission?'''
         buf = self.bufs.get(buf_id)
         if not buf:
             return
-        if G.MIRRORED_SAVES:
-            view = self.get_view(data['id'])
-            if view:
-                self.save_view(view)
-            elif 'buf' in buf:
-                utils.save_buf(buf)
+        view = self.get_view(data['id'])
+        if view:
+            self.save_view(view)
+        elif 'buf' in buf:
+            utils.save_buf(buf)
         username = self.get_username_by_id(data['user_id'])
         msg.log('%s saved buffer %s' % (username, buf['path']))
 

@@ -10,7 +10,8 @@ except ImportError:
 
 
 try:
-    str_instances = (str, basestring)
+    import __builtin__
+    str_instances = (str, __builtin__.basestring)
 except Exception:
     str_instances = (str, )
 
@@ -54,10 +55,12 @@ class APIResponse():
             self.body = json.loads(r.read().decode("utf-8"))
 
 
-def proxy_api_request(url, data=None):
+def proxy_api_request(url, data, method):
     args = ['python', '-m', 'floo.proxy', '--url', url]
     if data:
         args += ["--data", json.dumps(data)]
+    if method:
+        args += ["--method", method]
     msg.log('Running %s (%s)' % (' '.join(args), G.PLUGIN_PATH))
     proc = subprocess.Popen(args, cwd=G.PLUGIN_PATH, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     (stdout, stderr) = proc.communicate()
@@ -70,10 +73,12 @@ def proxy_api_request(url, data=None):
     return r
 
 
-def hit_url(url, data=None):
+def hit_url(url, data, method):
     if data:
         data = json.dumps(data).encode('utf-8')
     r = Request(url, data=data)
+    r.method = method
+    r.get_method = lambda: method
     r.add_header('Authorization', 'Basic %s' % get_basic_auth())
     r.add_header('Accept', 'application/json')
     r.add_header('Content-type', 'application/json')
@@ -87,50 +92,59 @@ def hit_url(url, data=None):
     return urlopen(r, timeout=5)
 
 
-def api_request(url, data=None):
+def api_request(url, data=None, method=None):
+    if data:
+        method = method or 'POST'
+    else:
+        method = method or 'GET'
     if ssl is False:
-        return proxy_api_request(url, data)
+        return proxy_api_request(url, data, method)
     try:
-        r = hit_url(url, data)
+        r = hit_url(url, data, method)
     except HTTPError as e:
         r = e
     return APIResponse(r)
 
 
 def create_workspace(post_data):
-    url = 'https://%s/api/workspace/' % G.DEFAULT_HOST
-    return api_request(url, post_data)
+    api_url = 'https://%s/api/workspace' % G.DEFAULT_HOST
+    return api_request(api_url, post_data)
+
+
+def update_workspace(owner, workspace, data):
+    api_url = 'https://%s/api/workspace/%s/%s' % (G.DEFAULT_HOST, owner, workspace)
+    return api_request(api_url, data, method='PUT')
 
 
 def get_workspace_by_url(url):
     result = utils.parse_url(url)
-    api_url = 'https://%s/api/workspace/%s/%s/' % (result['host'], result['owner'], result['workspace'])
+    api_url = 'https://%s/api/workspace/%s/%s' % (result['host'], result['owner'], result['workspace'])
     return api_request(api_url)
 
 
 def get_workspace(owner, workspace):
-    api_url = 'https://%s/api/workspace/%s/%s/' % (G.DEFAULT_HOST, owner, workspace)
+    api_url = 'https://%s/api/workspace/%s/%s' % (G.DEFAULT_HOST, owner, workspace)
     return api_request(api_url)
 
 
 def get_workspaces():
-    api_url = 'https://%s/api/workspace/can/view/' % (G.DEFAULT_HOST)
+    api_url = 'https://%s/api/workspace/can/view' % (G.DEFAULT_HOST)
     return api_request(api_url)
 
 
 def get_orgs():
-    api_url = 'https://%s/api/orgs/' % (G.DEFAULT_HOST)
+    api_url = 'https://%s/api/orgs' % (G.DEFAULT_HOST)
     return api_request(api_url)
 
 
 def get_orgs_can_admin():
-    api_url = 'https://%s/api/orgs/can/admin/' % (G.DEFAULT_HOST)
+    api_url = 'https://%s/api/orgs/can/admin' % (G.DEFAULT_HOST)
     return api_request(api_url)
 
 
 def send_error(data):
     try:
-        api_url = 'https://%s/api/error/' % (G.DEFAULT_HOST)
+        api_url = 'https://%s/api/error' % (G.DEFAULT_HOST)
         return api_request(api_url, data)
     except Exception as e:
         print(e)
