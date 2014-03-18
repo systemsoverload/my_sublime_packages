@@ -57,10 +57,8 @@ class Listener(sublime_plugin.EventListener):
     def disable_stalker_mode(self, timeout, agent):
         if G.STALKER_MODE is True:
             agent.temp_disable_stalk = True
-            self.disable_stalker_mode_timeout = utils.set_timeout(self.reenable_stalker_mode, timeout)
-        elif self.disable_stalker_mode_timeout:
-            utils.cancel_timeout(self.disable_stalker_mode_timeout)
-            self.disable_stalker_mode_timeout = utils.set_timeout(self.reenable_stalker_mode, timeout)
+        utils.cancel_timeout(self.disable_stalker_mode_timeout)
+        self.disable_stalker_mode_timeout = utils.set_timeout(self.reenable_stalker_mode, timeout)
 
     @if_connected
     def on_clone(self, view, agent):
@@ -77,7 +75,7 @@ class Listener(sublime_plugin.EventListener):
 
     @if_connected
     def on_close(self, view, agent):
-        msg.debug('close', self.name(view))
+        msg.debug('Sublime closed view %s' % self.name(view))
 
     @if_connected
     def on_load(self, view, agent):
@@ -197,7 +195,6 @@ class Listener(sublime_plugin.EventListener):
     def on_selection_modified(self, view, agent, buf=None):
         buf = is_view_loaded(view)
         if buf:
-            self.disable_stalker_mode(2000)
             agent.selection_changed.append((view, buf, False))
 
     @if_connected
@@ -207,3 +204,21 @@ class Listener(sublime_plugin.EventListener):
             msg.debug('activated view %s buf id %s' % (buf['path'], buf['id']))
             self.on_modified(view)
             agent.selection_changed.append((view, buf, False))
+
+    # ST3 calls on_window_command, but not on_post_window_command
+    # resurrect when on_post_window_command works.
+    # def on_window_command(self, window, command_name, args):
+    #     if command_name not in ("show_quick_panel", "show_input_panel"):
+    #         return
+    #     self.pending_commands += 1
+    #     if not G.AGENT:
+    #         return
+    #     G.AGENT.temp_disable_stalk = True
+
+    # def on_post_window_command(self, window, command_name, args):
+    #     if command_name not in ("show_quick_panel", "show_input_panel", "show_panel"):
+    #         return
+    #     self.pending_commands -= 1
+    #     if not G.AGENT or self.pending_commands > 0:
+    #         return
+    #     G.AGENT.temp_disable_stalk = False

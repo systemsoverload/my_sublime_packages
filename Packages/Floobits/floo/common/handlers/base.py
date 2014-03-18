@@ -23,6 +23,7 @@ class BaseHandler(event_emitter.EventEmitter):
     def __init__(self):
         super(BaseHandler, self).__init__()
         G.AGENT = self
+        self.reload_settings()
 
     def build_protocol(self, *args):
         self.proto = self.PROTOCOL(*args)
@@ -42,6 +43,10 @@ class BaseHandler(event_emitter.EventEmitter):
     @property
     def client(self):
         return editor.name()
+
+    @property
+    def codename(self):
+        return editor.codename()
 
     def _on_error(self, data):
         message = 'Error from server! Message: %s' % str(data.get('msg'))

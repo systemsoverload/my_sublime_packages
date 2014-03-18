@@ -2,11 +2,11 @@ import sys
 
 try:
     import sublime
-except:
+except Exception:
     pass
 
 welcome_text = 'Welcome %s!\n\nYou\'re all set to collaborate. You should check out our docs at https://%s/help/plugins/sublime#usage. \
-You must run \'Floobits - Complete Sign Up\' in the command palette before you can login to floobits.com.'
+You must run \'Floobits - Complete Sign Up\' in the command palette before you can sign in to floobits.com.'
 
 
 def name():
@@ -15,6 +15,10 @@ def name():
     else:
         py_version = 3
     return 'Sublime Text %s' % py_version
+
+
+def codename():
+    return 'sublime'
 
 
 def ok_cancel_dialog(dialog):
